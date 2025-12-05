@@ -22,6 +22,8 @@ const runtimeStack = new AgentCoreRuntimeStack(app, 'AgentCoreRuntime', {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION || 'us-east-1',
   },
-  ecrRepositoryName: 'strands_agent_repository',
+  agentRepository: infraStack.agentRepository,
+  agentRole: infraStack.agentRole,
+  agentName: 'strands_agent',
   description: 'AgentCore Runtime: Container-based agent with built-in Cognito authentication',
 });

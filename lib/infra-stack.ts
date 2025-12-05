@@ -10,6 +10,9 @@ export interface AgentCoreInfraStackProps extends cdk.StackProps {
 }
 
 export class AgentCoreInfraStack extends cdk.Stack {
+  public readonly agentRepository: ecr.Repository;
+  public readonly agentRole: iam.Role;
+
   /**
    *
    * @param {Construct} scope
@@ -20,7 +23,7 @@ export class AgentCoreInfraStack extends cdk.Stack {
     super(scope, id, props);
 
     // Create ECR repository for the agent container
-    const agentRepository = new ecr.Repository(this, 'AgentRepository', {
+    this.agentRepository = new ecr.Repository(this, 'AgentRepository', {
       repositoryName: props?.ecrRepositoryName,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       emptyOnDelete: true,
@@ -31,13 +34,13 @@ export class AgentCoreInfraStack extends cdk.Stack {
     });
 
     // Create IAM role for the agent runtime
-    const agentRole = new iam.Role(this, 'AgentRuntimeRole', {
+    this.agentRole = new iam.Role(this, 'AgentRuntimeRole', {
       assumedBy: new iam.ServicePrincipal('bedrock-agentcore.amazonaws.com'),
       description: 'Execution role for AgentCore runtime',
     });
 
     // Agent Role access to ECR Images
-    agentRole.addToPolicy(new iam.PolicyStatement({
+    this.agentRole.addToPolicy(new iam.PolicyStatement({
       sid: 'ECRImageAccess',
       effect: iam.Effect.ALLOW,
       actions: [
@@ -47,13 +50,21 @@ export class AgentCoreInfraStack extends cdk.Stack {
       resources: [`arn:aws:ecr:${this.region}:${this.account}:repository/*`],
     }));
 
+    // Agent Role access to ECR Token Access
+    this.agentRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'ECRTokenAccess',
+      effect: iam.Effect.ALLOW,
+      actions: ['ecr:GetAuthorizationToken'],
+      resources: ['*'],
+    }));
+
     // Agent Role access to CloudWatch Logs
-    agentRole.addManagedPolicy(
+    this.agentRole.addManagedPolicy(
         iam.ManagedPolicy.fromAwsManagedPolicyName("CloudWatchFullAccess")
     );
 
     // Agent Role access to X-Ray Tracing
-    agentRole.addToPolicy(new iam.PolicyStatement({
+    this.agentRole.addToPolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: [
         'xray:PutTraceSegments',
@@ -65,7 +76,7 @@ export class AgentCoreInfraStack extends cdk.Stack {
     }));
 
     // Agent Role access Bedrock Model Invocation (including Converse API and Inference Profiles)
-    agentRole.addToPolicy(new iam.PolicyStatement({
+    this.agentRole.addToPolicy(new iam.PolicyStatement({
       sid: 'BedrockModelInvocation',
       effect: iam.Effect.ALLOW,
       actions: [
@@ -83,13 +94,14 @@ export class AgentCoreInfraStack extends cdk.Stack {
     }));
 
     // Outputs
-    new cdk.CfnOutput(this, 'RepositoryUri', {
-      value: agentRepository.repositoryUri,
+    new cdk.CfnOutput(this, 'AgentRepositoryUri', {
+      value: this.agentRepository.repositoryUri,
       description: 'ECR Repository URI for agent container',
+      exportName: 'AgentRepositoryUri'
     });
 
-    new cdk.CfnOutput(this, 'RoleArn', {
-      value: agentRole.roleArn,
+    new cdk.CfnOutput(this, 'AgentCoreRuntimeRoleArn', {
+      value: this.agentRole.roleArn,
       description: 'IAM Role ARN for AgentCore Runtime',
       exportName: 'AgentCoreRuntimeRoleArn',
     });
